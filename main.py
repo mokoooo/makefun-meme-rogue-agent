@@ -18,10 +18,13 @@ convention), otherwise /output. The file written is entry.png.
 """
 
 import os
+import struct
 from pathlib import Path
 
 ASSET_NAME = "entry.png"
 PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
+MAX_ASSET_BYTES = 1_048_576
+MAX_DIMENSION = 1024
 
 
 def main() -> None:
@@ -29,6 +32,19 @@ def main() -> None:
     data = asset.read_bytes()
     if not data.startswith(PNG_MAGIC):
         raise ValueError(f"{ASSET_NAME} is not a PNG image")
+    if len(data) > MAX_ASSET_BYTES:
+        raise ValueError(
+            f"{ASSET_NAME} is {len(data)} bytes, over the sealed gate "
+            f"of {MAX_ASSET_BYTES} bytes"
+        )
+    if len(data) < 24 or data[12:16] != b"IHDR":
+        raise ValueError(f"{ASSET_NAME} has no PNG IHDR chunk")
+    width, height = struct.unpack(">II", data[16:24])
+    if width > MAX_DIMENSION or height > MAX_DIMENSION:
+        raise ValueError(
+            f"{ASSET_NAME} is {width}x{height}, over the sealed gate "
+            f"of {MAX_DIMENSION}x{MAX_DIMENSION} pixels"
+        )
     out_dir = Path(os.environ.get("MAKEFUN_OUTPUT_DIR") or "/output")
     out_dir.mkdir(parents=True, exist_ok=True)
     target = out_dir / ASSET_NAME
